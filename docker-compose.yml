@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Define the PostgreSQL service
+  postgres-db:
+    image: postgres:latest
+    container_name: mypostgrescontainer
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: pool
+    ports:
+      - "5432:5432"
+    networks:
+      - networkpostgres
+
+   # pgAdmin Service
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmincontainer
+    environment:
+      PGADMIN_DEFAULT_EMAIL: mohitthakur19996@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "8080:80"  # pgAdmin runs on port 80 inside the container, mapped to 8080 on the host
+    depends_on:
+      - postgres-db
+    networks:
+      - networkpostgres
+
+  # Define the Eureka server
+  eureka-service:
+    image: eureka
+    container_name: eurekacontainer
+    ports:
+      - "8761:8761"
+    networks:
+      - networkpostgres
+    environment:
+      - EUREKA_INSTANCE_HOSTNAME=eurekacontainer
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+      - SERVER_PORT=8761
+
+
+  # Define the API Gateway
+  apigateways-service:
+    image: apigatewayimage
+    container_name: apigatewaycontainer
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eurekacontainer:8761/eureka/   # Eureka URL
+      - SPRING_APPLICATION_NAME=apigateway-service  # Service name in Eureka
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+    ports:
+      - "8072:8072"
+    depends_on:
+      - eureka-service
+    networks:
+      - networkpostgres
+
+  # Define the Spring Boot microservice
+  customer-service:
+    image: customerimage
+    container_name: customercontainer
+    environment:
+      - POSTGRES_HOST=mypostgrescontainer
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB_NAME=pool
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eurekacontainer:8761/eureka/   # Eureka URL
+      - SPRING_APPLICATION_NAME=customer-service  # Service name in Eureka
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+      - SPRING_REDIS_HOST=localhost  # Ensure this matches the Redis container name
+      - SPRING_REDIS_PORT=6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres-db
+      - eureka-service
+    networks:
+      - networkpostgres
+
+    # Define the Spring Boot microservice
+  feedback-service:
+    image: feedbackimage
+    container_name: feedbackcontainer
+    environment:
+      - POSTGRES_HOST=mypostgrescontainer
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB_NAME=pool
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eurekacontainer:8761/eureka/   # Eureka URL
+      - SPRING_APPLICATION_NAME=feedback-service  # Service name in Eureka
+      - EUREKA_INSTANCE_PREFERIPADDRESS=true
+    ports:
+      - "8082:8082"
+    depends_on:
+      - postgres-db
+      - eureka-service
+    networks:
+      - networkpostgres
+      
+
+networks:
+  networkpostgres:
+    driver: bridge
